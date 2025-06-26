@@ -1,0 +1,75 @@
+#!/bin/bash
+clear
+echo **WARNING - MAKE SURE THIS IS RUN WITH SUDO**
+echo Error 500/file not found below = VM not powered on
+sleep 5
+# Set TOKEN and SECRET
+TOKEN='<your-token>' # example: TOKEN='admin@pve!vm_console'
+SECRET='<your-api-secret>' # replace with your Token secret that is shown ONCE upon creating the Token
+
+VMID="$1"
+HOST="<your-hostname>"
+# building authheader
+AUTHHEADER="Authorization: PVEAPIToken=${TOKEN}=${SECRET}"
+
+# for custom certificates, in times of letsencrypt this should be necessary only for testing
+# all following instances of curl calls have -k removed as well, add it back if needed
+RESPONSE=`curl -f -s -S -k -H "${AUTHHEADER}" "https://${HOST}:8006/api2/json/nodes"`
+
+NODES=`echo ${RESPONSE} | jq -r ".[] | {nodes: .[].node}" | jq -r ".nodes"`
+for NODE in ${NODES}
+do
+
+# FIND VMID LXC
+# uncomment below if you're using lxc
+
+#   RESPONSE=`curl -f -s -S -k -H "${AUTHHEADER}" "https://${HOST}:8006/api2/json/nodes/${NODE}/lxc"`
+
+#   if [[ ${RESPONSE} ]]; then
+#       LVMID=`echo ${RESPONSE} | jq -r ".[] | {vmid: .[].vmid}" | jq -r ".vmid"`
+#       if [[ "${LVMID}" == *"${VMID}"* ]]; then
+#           NODENAME=${NODE}
+#           VMTYPE="lxc"
+#       fi
+#   fi
+
+# FIND VMID qemu
+    RESPONSE=`curl -f -s -k -S -H "${AUTHHEADER}" "https://${HOST}:8006/api2/json/nodes/${NODE}/qemu"`
+
+    if [[ ${RESPONSE} ]]; then
+        QVMID=`echo ${RESPONSE} | jq -r ".[] | {vmid: .[].vmid}" | jq -r ".vmid"`
+        if [[ "${QVMID}" == *"${VMID}"* ]]; then
+            NODENAME=${NODE}
+            VMTYPE="qemu"
+        fi
+    fi
+done
+
+if [ "$NODENAME" != "$NODE" ]
+  then
+    echo $NODENAME
+    echo $NODE
+    echo VMID provided is not online, please start it and retry.
+  else
+
+# create tmp file for spiceconfig
+TMP=`mktemp`
+
+# undocumented api call - old - maybe deprecated
+curl -f -s -k -S -H "${AUTHHEADER}" "https://${HOST}:8006/api2/spiceconfig/nodes/${NODENAME}/qemu/${VMID}/spiceproxy" -d "proxy=${HOST}" > $TMP
+
+tee -a $TMP <<'EOF'  > /dev/null
+# add custom virt-viewer options here
+color-depth=32
+enable-usbredir=1
+enable-usb-autoshare=1
+enable-smartcard=0
+#usb-filter=-1,0x1050,0x0407,-1,1|1,0x076b,0x5022,-1,1|-1,-1,-1,-1,1 #Filters provided here cover YubiKeys and YubiHSM2's.  Adjust for your requirements and uncomment.
+fullscreen=0
+
+EOF
+
+remote-viewer $TMP &
+
+
+fi
