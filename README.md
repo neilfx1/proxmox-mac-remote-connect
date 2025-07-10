@@ -16,7 +16,8 @@ I recommend you use a venv.  If you do this, change the python3 location at the 
 ## 🖥️ Requirements
 
 - macOS (tested on recent versions)
-- `remote-viewer` installed (`brew install remote-viewer`)
+- Brew
+- `virt-viewer` installed (`brew install jeffreywildman/virt-manager/virt-viewer`)
 - `jq` and `curl` installed
 - python requires PyQT5, proxmoxer and urllib3 (`pip install -r requirements.txt`)
 - A Proxmox API token (see below)
@@ -52,6 +53,8 @@ sudo ./remotepv <vmid>
 ```
 
 To use the GUI (must also have sudo rights to invoke the script):
+
+Important: Before using, edit the file and set the path for remotepv at lines 128 and 130.
 
 ```bash
 python3 proxqt5.py
